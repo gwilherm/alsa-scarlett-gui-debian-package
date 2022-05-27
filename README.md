@@ -1,2 +1,2 @@
 # alsa-scarlett-gui-debian-package
-Package for alsa-scarlett-gui
+Debian package for [alsa-scarlett-gui](https://github.com/geoffreybennett/alsa-scarlett-gui)
