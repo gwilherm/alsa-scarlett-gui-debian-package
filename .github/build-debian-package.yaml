@@ -1,0 +1,97 @@
+name: Build debian package
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        required: true
+      ref:
+        required: true
+
+env:
+  APP_NAME:    alsa-scarlett-gui
+  APP_VERSION: ${{ github.event.inputs.version }}
+  REF:         ${{ github.event.inputs.ref }}
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt -y update
+          # Compilation dependencies
+          sudo apt -y install git make gcc libgtk-4-dev libasound2-dev
+          # Documentation dependencies
+          sudo apt -y install pandoc
+
+      - name: Checkout the sources
+        uses: actions/checkout@v3
+        with:
+          path: ${{ github.event.repository.name }}
+
+      - name: Checkout the sources
+        uses: actions/checkout@v3
+        with:
+          repository: geoffreybennett/${{ env.APP_NAME }}
+          ref: ${{ env.REF }}
+          path: ${{ env.APP_NAME }}
+
+      - name: Build from sources
+        working-directory: ${{ env.APP_NAME }}
+        run: |
+          make -C src -j4 PREFIX=/usr
+      
+      - name: Generate the documentation
+        working-directory: ${{ env.APP_NAME }}
+        run : |
+          cp ${{ github.workspace }}/${{ github.event.repository.name }}/pandoc.css ./
+          sed -i 's/USAGE.md/USAGE.html/g' README.md
+          pandoc -s --css pandoc.css -o README.html     README.md
+          pandoc -s --css pandoc.css -o USAGE.html      USAGE.md
+          pandoc -s --css pandoc.css -o INTERFACES.html INTERFACES.md
+
+      - name: Prepare package workspace
+        working-directory: ${{ env.APP_NAME }}
+        run: |
+          mkdir -p ${{ github.workspace }}/deb-workspace/usr/bin \
+                   ${{ github.workspace }}/deb-workspace/usr/share/applications \
+                   ${{ github.workspace }}/usr/share/icons/hicolor/256x256/apps \
+                   ${{ github.workspace }}/deb-workspace/usr/share/doc/${{ env.APP_NAME }}-${{ env.APP_VERSION }}
+          cp src/alsa-scarlett-gui               ${{ github.workspace }}/deb-workspace/usr/bin/
+          cp src/vu.b4.alsa-scarlett-gui.desktop ${{ github.workspace }}/deb-workspace/usr/share/applications/
+          cp src/img/alsa-scarlett-gui.png       ${{ github.workspace }}/usr/share/icons/hicolor/256x256/apps/
+          cp -r *.html *.css img demo            ${{ github.workspace }}/deb-workspace/usr/share/doc/${{ env.APP_NAME }}-${{ env.APP_VERSION }}/
+          
+      - name: Build debian package
+        uses: jiro4989/build-deb-action@v2
+        with:
+          package: ${{ env.APP_NAME }}
+          package_root: ${{ github.workspace }}/deb-workspace
+          maintainer: gwilherm
+          version: ${{ env.APP_VERSION }}
+          desc: ${{ env.APP_NAME }} is a Gtk4 GUI for the ALSA controls presented by the Linux kernel Focusrite Scarlett Gen 2/3 Mixer Driver.
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ env.APP_VERSION }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        id: upload-release-asset 
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./${{ env.APP_NAME }}_${{ env.APP_VERSION }}_amd64.deb
+          asset_name: ${{ env.APP_NAME }}_${{ env.APP_VERSION }}_amd64.deb
+          asset_content_type: application/vnd.debian.binary-package
+          
