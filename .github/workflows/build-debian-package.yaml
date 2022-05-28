@@ -37,7 +37,10 @@ jobs:
 
       - name: Get the software version
         working-directory: ${{ env.APP_NAME }}
-        run: echo "APP_VERSION=$(git describe --abbrev=4 --dirty --always --tags)" >> $GITHUB_ENV
+        run: |
+          # The command cannot find the tag on shallow clone
+          git fetch --unshallow
+          echo "APP_VERSION=$(git describe --abbrev=4 --dirty --always --tags)" >> $GITHUB_ENV
 
       - name: Build from sources
         working-directory: ${{ env.APP_NAME }}
