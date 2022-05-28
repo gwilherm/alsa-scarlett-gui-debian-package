@@ -3,15 +3,12 @@ name: Build debian package
 on:
   workflow_dispatch:
     inputs:
-      version:
-        required: true
       ref:
         required: true
 
 env:
-  APP_NAME:    alsa-scarlett-gui
-  APP_VERSION: ${{ github.event.inputs.version }}
-  REF:         ${{ github.event.inputs.ref }}
+  APP_NAME: alsa-scarlett-gui
+  REF:      ${{ github.event.inputs.ref }}
 
 jobs:
   build:
@@ -37,6 +34,10 @@ jobs:
           repository: geoffreybennett/${{ env.APP_NAME }}
           ref: ${{ env.REF }}
           path: ${{ env.APP_NAME }}
+
+      - name: Get the software version
+        working-directory: ${{ env.APP_NAME }}
+        run: echo "APP_VERSION=$(git describe --abbrev=4 --dirty --always --tags)" >> $GITHUB_ENV
 
       - name: Build from sources
         working-directory: ${{ env.APP_NAME }}
@@ -79,7 +80,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}
+          tag_name: ${{ env.APP_VERSION }}
           release_name: Release ${{ env.APP_VERSION }}
           draft: false
           prerelease: false
